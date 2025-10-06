@@ -1525,6 +1525,8 @@ WHERE
 	 * @return array List of posts.
 	 */
 	private function get_post_orders_for_ids( array $orders ): array {
+		$legacy_handler = wc_get_container()->get( \Automattic\WooCommerce\Internal\DataStores\Orders\LegacyDataHandler::class );
+
 		$order_ids = array_keys( $orders );
 		// We have to bust meta cache, otherwise we will just get the meta cached by OrderTableDataStore.
 		foreach ( $order_ids as $order_id ) {
@@ -1557,7 +1559,7 @@ WHERE
 
 				try {
 					$cpt_order->set_id( $order_id );
-					$cpt_store->read( $cpt_order );
+					$legacy_handler->read_order_from_datastore( $cpt_order, $cpt_store );
 					$cpt_orders[ $order_id ] = $cpt_order;
 				} catch ( Exception $e ) {
 					// If the post record has been deleted (for instance, by direct query) then an exception may be thrown.
@@ -1647,7 +1649,7 @@ WHERE
 
 			$order2_values = ArrayUtil::select( $order2_meta_by_key[ $key ], 'value', ArrayUtil::SELECT_BY_ARRAY_KEY );
 			$new_diff      = ArrayUtil::deep_assoc_array_diff( $order1_values, $order2_values );
-			if ( ! empty( $new_diff ) && $sync ) {
+			if ( ! empty( $new_diff ) ) {
 				if ( count( $order2_values ) > 1 ) {
 					$sync && $order1->delete_meta_data( $key );
 					foreach ( $order2_values as $post_order_value ) {
