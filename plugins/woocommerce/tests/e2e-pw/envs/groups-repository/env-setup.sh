@@ -1,13 +1,47 @@
 #!/bin/bash
-
-# Run from within plugins/woocommerce using the latest release
+#
+# Use the BRANCH or RELEASE environment variables to specify with which version from the repository to work.
+#
+# Currently we can not receive --branch or --release arguments,
+# because the calling script run-tests-with-env.sh does not pass any arguments to this script.
+# The following invocations are currently NOT SUPPORTED:
+# $ pnpm test:e2e:with-env groups-repository --release=3.7.0
+# $ pnpm test:e2e:with-env groups-repository --branch
+# $ pnpm test:e2e:with-env groups-repository --branch=tested-3.8.0-6.8
+# $ pnpm test:e2e:with-env groups-repository --branch=tested-3.8.0-6.8 --project=e2e
+# See the EXAMPLES BELOW for examples using environment variables instead.
+#
+# If at a later point the script does pass other arguments, we need to make sure
+# to consume the branch and/or release parameters so they are not present anymore
+# when run-tests-with-env.sh invokes
+# pnpm playwright test --config="$configFile" "$@"
+# as the call will complain about unsupported parameters.
+#
+# Usage:
+#
+# Run this from within plugins/woocommerce ...
+#
+# Run all tests using the latest release
 # $ pnpm test:e2e:with-env groups-repository
 #
-# Using a specific release:
-# $ pnpm test:e2e:with-env groups-repository --release=3.7.0
+# Run all tests using a specific release:
+# $ env RELEASE="3.7.0" pnpm test:e2e:with-env groups-repository
 #
-# Using a specific branch:
-# $ pnpm test:e2e:with-env groups-repository --branch=tested-3.8.0-3.8
+# Run all tests using the master branch:
+# $ env BRANCH="master" pnpm test:e2e:with-env groups-repository
+#
+# Run all tests using a specific branch:
+# $ env BRANCH="tested-3.8.0-6.8" pnpm test:e2e:with-env groups-repository
+#
+# Run only E2E tests using the latest release:
+# $ pnpm test:e2e:with-env groups-repository --project=e2e
+#
+# Run only API tests, using the latest release:
+# $ pnpm test:e2e:with-env groups-repository --project=api
+#
+# Run only E2E tests using a specific branch:
+# $ env BRANCH="tested-3.8.0-6.8" pnpm test:e2e:with-env groups-repository --project=e2e
+#
 
 set -eo pipefail
 
@@ -18,28 +52,44 @@ SCRIPT_PATH=$(
 	pwd -P
 )
 
-BRANCH=""
-RELEASE="latest"
+if [ -z $BRANCH ]
+then
+	BRANCH=""
+fi
+if [ -z $RELEASE ]
+then
+	RELEASE="latest"
+fi
 
-while [ $# -gt 0 ]; do
-	case "$1" in
-		# --branch value or --branch=value
-		--branch|--branch=*)
-			# no "=" take next value
-			if [[ "$1" != *=* ]]; then shift; fi
-			BRANCH="${1#*=}"
-			if [[ -z "$BRANCH" ]]; then
-				BRANCH="master"
-			fi
-			;;
-		--release|--release=*)
-			# no "=" take next value
-			if [[ "$1" != *=* ]]; then shift; fi
-			RELEASE="${1#*=}"
-			;;
-	esac
-	shift
-done
+#
+# Code to obtain --branch or --release arguments which is not possible for the reasons outlined above.
+#
+#args=( )
+#while [ $# -gt 0 ]; do
+#	case "$1" in
+#		# --branch value or --branch=value
+#		--branch|--branch=*)
+#			# no "=" take next value
+#			if [[ "$1" != *=* ]]; then shift; fi
+#			BRANCH="${1#*=}"
+#			if [[ -z "$BRANCH" ]]; then
+#				BRANCH="master"
+#			fi
+#			;;
+#		--release|--release=*)
+#			# no "=" take next value
+#			if [[ "$1" != *=* ]]; then shift; fi
+#			RELEASE="${1#*=}"
+#			;;
+#		*)
+#			args+=( "$1" )
+#			echo "ARGS: $args"
+#			;;
+#	esac
+#	shift
+#done
+#
+#set -- "${args[@]}"
 
 if [[ -z "$BRANCH" ]]; then
 	echo "Installing Groups from release $RELEASE"
@@ -49,11 +99,12 @@ if [[ -z "$BRANCH" ]]; then
 		# download_url=$( curl -s "https://api.github.com/repos/itthinx/groups/releases/$RELEASE" | grep browser_download_url | cut -d '"' -f 4 )
 		download_url=$( curl -s "https://api.github.com/repos/itthinx/groups/releases/$RELEASE" | grep zipball_url | cut -d '"' -f 4 )
 	else
-		download_url="https://api.github.com/repos/itthinx/groups/releases/tags/$RELEASE"
+		download_url="https://github.com/itthinx/groups/archive/refs/tags/$RELEASE.zip"
 	fi
 else
 	echo "Installing Groups from branch $BRANCH"
 	download_url="https://github.com/itthinx/groups/archive/refs/heads/$BRANCH.zip"
+	echo "Download URL $download_url"
 fi
 
 echo "Downloading ... $download_url"
